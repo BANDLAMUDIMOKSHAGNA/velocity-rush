@@ -360,7 +360,7 @@ function init() {
   window.addEventListener('keydown', e => { keys[e.code] = true; handleKey(e); });
   window.addEventListener('keyup', e => { keys[e.code] = false; });
   window.addEventListener('resize', onResize);
-  setupMobile();
+  setupControls();
 
   animate();
 }
