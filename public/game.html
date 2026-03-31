@@ -73,12 +73,24 @@ canvas{display:block;position:fixed;top:0;left:0;width:100%;height:100%;z-index:
 .results-list{font-size:18px;line-height:2.2;text-align:center}
 .results-list .p1{color:gold;font-weight:700;font-size:22px}
 
-/* Mobile controls */
-.mobile-controls{position:fixed;bottom:0;left:0;right:0;z-index:15;display:none;padding:10px;justify-content:space-between}
-@media(max-width:768px){.mobile-controls{display:flex}}
-.m-btn{pointer-events:all;width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;-webkit-tap-highlight-color:transparent}
-.m-dpad{display:grid;grid-template-columns:60px 60px 60px;grid-template-rows:60px 60px;gap:4px}
-.m-actions{display:flex;gap:8px;align-items:flex-end}
+/* On-screen controls - always visible */
+.game-controls{position:fixed;bottom:0;left:0;right:0;z-index:15;display:flex;padding:14px 20px;justify-content:space-between;align-items:flex-end;pointer-events:none}
+.ctrl-group{display:flex;gap:6px;align-items:flex-end;pointer-events:none}
+.ctrl-btn{pointer-events:all;cursor:pointer;border-radius:12px;background:rgba(255,255,255,0.12);border:2px solid rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;color:#fff;-webkit-tap-highlight-color:transparent;user-select:none;backdrop-filter:blur(4px);transition:background 0.1s,border-color 0.1s}
+.ctrl-btn:active,.ctrl-btn.pressed{background:rgba(255,255,255,0.35);border-color:rgba(255,255,255,0.6)}
+.ctrl-btn .label{font-size:10px;letter-spacing:1px;text-transform:uppercase;opacity:0.7;margin-top:2px}
+.ctrl-dir{width:64px;height:64px;font-size:24px}
+.ctrl-pedal{width:72px;height:80px;font-size:16px;flex-direction:column;gap:2px}
+.ctrl-action{width:56px;height:56px;font-size:11px;font-weight:700;letter-spacing:1px}
+.ctrl-pedal.gas{border-color:rgba(0,200,0,0.5);color:#0c0}
+.ctrl-pedal.gas:active,.ctrl-pedal.gas.pressed{background:rgba(0,200,0,0.3);border-color:#0c0}
+.ctrl-pedal.brake{border-color:rgba(255,50,50,0.5);color:#f44}
+.ctrl-pedal.brake:active,.ctrl-pedal.brake.pressed{background:rgba(255,50,50,0.3);border-color:#f44}
+.ctrl-pedal.reverse{border-color:rgba(255,165,0,0.5);color:#fa0}
+.ctrl-pedal.reverse:active,.ctrl-pedal.reverse.pressed{background:rgba(255,165,0,0.3);border-color:#fa0}
+.dpad-wrap{display:grid;grid-template-columns:64px 64px;grid-template-rows:64px;gap:6px}
+.pedals-wrap{display:flex;gap:8px;align-items:flex-end}
+.actions-wrap{display:flex;gap:6px;flex-direction:column}
 </style>
 </head>
 <body>
@@ -175,16 +187,28 @@ ESC - Pause<br>
 </div>
 </div>
 
-<!-- Mobile -->
-<div class="mobile-controls" id="mobile-controls">
-<div class="m-dpad">
-<div></div><div class="m-btn" id="mb-up">▲</div><div></div>
-<div class="m-btn" id="mb-left">◄</div><div class="m-btn" id="mb-down">▼</div><div class="m-btn" id="mb-right">►</div>
-</div>
-<div class="m-actions">
-<div class="m-btn" id="mb-ers" style="font-size:11px">ERS</div>
-<div class="m-btn" id="mb-drs" style="font-size:11px">DRS</div>
-</div>
+<!-- On-screen controls -->
+<div class="game-controls" id="game-controls" style="display:none">
+  <div class="ctrl-group">
+    <div class="dpad-wrap">
+      <div class="ctrl-btn ctrl-dir" id="cb-left">◄</div>
+      <div class="ctrl-btn ctrl-dir" id="cb-right">►</div>
+    </div>
+  </div>
+  <div class="ctrl-group">
+    <div class="pedals-wrap">
+      <div class="ctrl-btn ctrl-pedal reverse" id="cb-reverse"><div style="text-align:center">⬇<div class="label">Back</div></div></div>
+      <div class="ctrl-btn ctrl-pedal brake" id="cb-brake"><div style="text-align:center">■<div class="label">Brake</div></div></div>
+      <div class="ctrl-btn ctrl-pedal gas" id="cb-gas"><div style="text-align:center">⬆<div class="label">Speed</div></div></div>
+    </div>
+  </div>
+  <div class="ctrl-group">
+    <div class="actions-wrap">
+      <div class="ctrl-btn ctrl-action" id="cb-ers">ERS</div>
+      <div class="ctrl-btn ctrl-action" id="cb-drs">DRS</div>
+      <div class="ctrl-btn ctrl-action" id="cb-hbrake">HB</div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -336,7 +360,7 @@ function init() {
   window.addEventListener('keydown', e => { keys[e.code] = true; handleKey(e); });
   window.addEventListener('keyup', e => { keys[e.code] = false; });
   window.addEventListener('resize', onResize);
-  setupMobile();
+  setupControls();
 
   animate();
 }
@@ -690,6 +714,7 @@ function startRace() {
         lights.forEach(id => document.getElementById(id).classList.remove('green'));
         document.getElementById('hud').style.display = 'block';
         gameState = 'racing';
+        showGameControls(true);
         raceStartTime = performance.now();
         lapStartTime = raceStartTime;
         sectorStartTime = raceStartTime;
@@ -702,6 +727,7 @@ function handleKey(e) {
   if (e.code === 'Escape' && gameState === 'racing') {
     gameState = 'paused';
     document.getElementById('pause-screen').style.display = 'flex';
+    showGameControls(false);
   } else if (e.code === 'Escape' && gameState === 'paused') {
     resumeGame();
   }
@@ -724,6 +750,7 @@ function handleKey(e) {
 function resumeGame() {
   gameState = 'racing';
   document.getElementById('pause-screen').style.display = 'none';
+  showGameControls(true);
 }
 
 function restartRace() {
@@ -757,12 +784,14 @@ function quitToMenu() {
   document.getElementById('hud').style.display = 'none';
   document.getElementById('menu-screen').style.display = 'flex';
   gameState = 'menu';
+  showGameControls(false);
 }
 
 function finishRace() {
   gameState = 'results';
   document.getElementById('hud').style.display = 'none';
   document.getElementById('results-screen').style.display = 'flex';
+  showGameControls(false);
 
   // Build results
   const all = [{name: 'YOU', lap: currentLap, progress: playerLapProgress, bestTime: bestLapTime}];
@@ -1183,20 +1212,32 @@ function drawMinimap() {
   });
 }
 
-// ============ MOBILE ============
-function setupMobile() {
+// ============ ON-SCREEN CONTROLS ============
+function setupControls() {
   const bind = (id, key) => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; initAudio(); }, {passive: false});
-    el.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; });
+    // Mouse support
+    el.addEventListener('mousedown', e => { e.preventDefault(); keys[key] = true; el.classList.add('pressed'); initAudio(); });
+    el.addEventListener('mouseup', e => { e.preventDefault(); keys[key] = false; el.classList.remove('pressed'); });
+    el.addEventListener('mouseleave', e => { keys[key] = false; el.classList.remove('pressed'); });
+    // Touch support
+    el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; el.classList.add('pressed'); initAudio(); }, {passive: false});
+    el.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; el.classList.remove('pressed'); });
+    el.addEventListener('touchcancel', e => { keys[key] = false; el.classList.remove('pressed'); });
   };
-  bind('mb-up', 'ArrowUp');
-  bind('mb-down', 'ArrowDown');
-  bind('mb-left', 'ArrowLeft');
-  bind('mb-right', 'ArrowRight');
-  bind('mb-ers', 'KeyX');
-  bind('mb-drs', 'KeyZ');
+  bind('cb-gas', 'ArrowUp');
+  bind('cb-brake', 'ArrowDown');
+  bind('cb-reverse', 'KeyS');
+  bind('cb-left', 'ArrowLeft');
+  bind('cb-right', 'ArrowRight');
+  bind('cb-ers', 'KeyX');
+  bind('cb-drs', 'KeyZ');
+  bind('cb-hbrake', 'Space');
+}
+
+function showGameControls(show) {
+  document.getElementById('game-controls').style.display = show ? 'flex' : 'none';
 }
 
 // ============ MAIN LOOP ============
