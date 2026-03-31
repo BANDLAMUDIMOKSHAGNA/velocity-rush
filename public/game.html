@@ -192,21 +192,23 @@ ESC - Pause<br>
 // ============ GAME CONFIG ============
 const TOTAL_LAPS = 5;
 const NUM_AI = 5;
-// Gear system: each gear has [power multiplier, max speed in internal units]
-// Internal speed 1.0 ≈ 20 km/h, so gear 6 tops at 16 = 320 km/h
-const GEAR_MAX_SPEED = [0, 2.5, 5, 8, 11, 14, 16]; // max speed per gear
-const GEAR_POWER =     [0, 0.06, 0.05, 0.045, 0.038, 0.032, 0.028]; // acceleration per gear
+const GEAR_MAX_SPEED = [0, 2.5, 5, 8, 11, 14, 16];
+const GEAR_POWER =     [0, 0.06, 0.05, 0.045, 0.038, 0.032, 0.028];
 const MAX_RPM = 12000;
 const IDLE_RPM = 3000;
-const REDLINE_RPM = 11400; // shift point
+const REDLINE_RPM = 11400;
 const MAX_SPEED = 320;
 const BRAKE_FORCE = 0.035;
-const ENGINE_BRAKE = 0.008; // engine braking when off throttle
-const STEER_SPEED = 0.035;
-const MAX_STEER = 0.045;
+const ENGINE_BRAKE = 0.008;
+const STEER_SPEED = 2.5;    // radians/sec steering input rate
+const MAX_STEER = 0.045;    // max steer angle
 const DRAG = 0.997;
-const GRASS_DRAG = 0.98;
-const AUTO_TRANSMISSION = true; // set false for manual only
+const GRASS_DRAG = 0.96;
+const GRAVEL_DRAG = 0.93;
+const AUTO_TRANSMISSION = true;
+const TRACK_HALF_WIDTH = 7; // half of 14-unit track
+const BARRIER_DIST = 16.5;  // trackHalf + kerb(1.5) + gravel(8) = 16.5
+const WALL_BOUNCE = 0.4;    // speed retained on wall hit
 
 // ============ TRACK WAYPOINTS (oval-ish circuit) ============
 const trackPoints = [];
@@ -788,9 +790,31 @@ function getClosestWaypoint(pos) {
   return { idx, dist: minDist };
 }
 
-function isOnTrack(pos) {
-  const { dist } = getClosestWaypoint(pos);
-  return dist < 10;
+// Returns: { centerDist, trackDir, perpDir, onTrack, onGravel, onGrass, hitBarrier }
+function getTrackInfo(pos) {
+  const { idx, dist } = getClosestWaypoint(pos);
+  const cur = trackPoints[idx];
+  const next = trackPoints[(idx + 1) % trackPoints.length];
+  const prev = trackPoints[(idx - 1 + trackPoints.length) % trackPoints.length];
+  const trackDir = new THREE.Vector3().subVectors(next, prev).normalize();
+  const perpDir = new THREE.Vector3(-trackDir.z, 0, trackDir.x);
+
+  // Signed distance from track center (positive = left, negative = right)
+  const toPos = new THREE.Vector3().subVectors(pos, cur);
+  const signedDist = toPos.dot(perpDir);
+  const absDist = Math.abs(signedDist);
+
+  return {
+    idx,
+    centerDist: absDist,
+    signedDist,
+    trackDir,
+    perpDir,
+    onTrack: absDist < TRACK_HALF_WIDTH,
+    onGravel: absDist >= TRACK_HALF_WIDTH + 1.5 && absDist < BARRIER_DIST,
+    onGrass: absDist >= TRACK_HALF_WIDTH && absDist < TRACK_HALF_WIDTH + 1.5,
+    hitBarrier: absDist >= BARRIER_DIST
+  };
 }
 
 function updatePlayer(dt) {
@@ -807,35 +831,28 @@ function updatePlayer(dt) {
 
   // Acceleration
   if (accel) {
-    // Only produce power if RPM is below redline
     if (playerRPM < MAX_RPM) {
       let power = GEAR_POWER[playerGear] * dt * 60;
-      // Reduce power as we approach gear's max speed
       const powerFalloff = Math.max(0, 1 - speedRatio * 0.9);
       power *= powerFalloff;
       if (ersActive && ers > 0) { power *= 1.4; ers = Math.max(0, ers - dt * 25); }
       if (drsActive) power *= 1.15;
       playerSpeed += power;
     }
-
-    // Auto upshift: shift when RPM hits redline
     if (AUTO_TRANSMISSION && playerRPM >= REDLINE_RPM && playerGear < 6) {
       playerGear++;
       playSound(1200, 0.05, 'square', 0.06);
     }
-    // Auto downshift: shift down when RPM drops too low
     if (AUTO_TRANSMISSION && playerRPM < IDLE_RPM + 1500 && playerGear > 1 && playerSpeed > 0.5) {
       playerGear--;
       playSound(600, 0.04, 'square', 0.05);
     }
   } else {
-    // Engine braking when off throttle
     if (playerSpeed > 0.1) {
       playerSpeed -= ENGINE_BRAKE * dt * 60;
     } else if (playerSpeed > 0) {
       playerSpeed = 0;
     }
-    // Auto downshift when coasting
     if (AUTO_TRANSMISSION && playerRPM < IDLE_RPM + 1000 && playerGear > 1) {
       playerGear--;
     }
@@ -847,7 +864,7 @@ function updatePlayer(dt) {
   }
 
   if (handbrake) {
-    playerSpeed *= 0.95;
+    playerSpeed *= Math.pow(0.92, dt * 60);
   }
 
   // ERS recharge when not active
@@ -856,43 +873,83 @@ function updatePlayer(dt) {
   }
   if (ers <= 0) ersActive = false;
 
-  // On/off track drag
-  const onTrack = isOnTrack(playerCar.position);
-  const dragVal = onTrack ? DRAG : GRASS_DRAG;
-  playerSpeed *= dragVal;
+  // Get surface info BEFORE moving
+  const info = getTrackInfo(playerCar.position);
+
+  // Surface-dependent drag
+  let dragVal = DRAG;
+  if (info.onGrass) dragVal = GRASS_DRAG;
+  else if (info.onGravel) dragVal = GRAVEL_DRAG;
+
+  // Apply drag (frame-rate independent)
+  playerSpeed *= Math.pow(dragVal, dt * 60);
   playerSpeed = Math.max(-5, Math.min(MAX_SPEED / 20, playerSpeed));
 
-  // Steering
-  const steerFactor = Math.max(0.3, 1 - Math.abs(playerSpeed) / (MAX_SPEED / 20));
-  if (left) playerSteer = Math.min(MAX_STEER, playerSteer + STEER_SPEED * dt);
-  else if (right) playerSteer = Math.max(-MAX_STEER, playerSteer - STEER_SPEED * dt);
-  else playerSteer *= 0.9;
+  // Reduce grip on grass/gravel
+  let gripMultiplier = 1.0;
+  if (info.onGrass) gripMultiplier = 0.5;
+  else if (info.onGravel) gripMultiplier = 0.3;
+
+  // Steering - speed-dependent: slower = tighter turns, faster = wider
+  const absSpd = Math.abs(playerSpeed);
+  const steerFactor = Math.max(0.2, 1 - absSpd / (MAX_SPEED / 15));
+  if (left) playerSteer = Math.min(MAX_STEER, playerSteer + STEER_SPEED * dt * steerFactor);
+  else if (right) playerSteer = Math.max(-MAX_STEER, playerSteer - STEER_SPEED * dt * steerFactor);
+  else playerSteer *= Math.pow(0.85, dt * 60); // self-center
 
   // Drift at high speed
-  const driftFactor = Math.abs(playerSpeed) > MAX_SPEED / 30 ? 0.85 : 1;
+  const driftFactor = absSpd > MAX_SPEED / 30 ? 0.8 : 1;
 
-  playerAngle += playerSteer * playerSpeed * 0.15 * driftFactor;
+  playerAngle += playerSteer * playerSpeed * 0.15 * driftFactor * gripMultiplier * dt * 60;
   playerCar.rotation.y = playerAngle;
 
-  // Move
-  playerCar.position.x += Math.sin(playerAngle) * playerSpeed;
-  playerCar.position.z += Math.cos(playerAngle) * playerSpeed;
+  // Calculate new position
+  const moveX = Math.sin(playerAngle) * playerSpeed * dt * 60;
+  const moveZ = Math.cos(playerAngle) * playerSpeed * dt * 60;
+  const newPos = new THREE.Vector3(
+    playerCar.position.x + moveX,
+    0.5,
+    playerCar.position.z + moveZ
+  );
+
+  // Check boundary at new position
+  const newInfo = getTrackInfo(newPos);
+
+  if (newInfo.hitBarrier) {
+    // Wall collision: push back to barrier edge and penalize speed
+    const pushBack = newInfo.perpDir.clone().multiplyScalar(
+      -Math.sign(newInfo.signedDist) * (newInfo.centerDist - BARRIER_DIST + 0.5)
+    );
+    newPos.add(pushBack);
+    playerSpeed *= WALL_BOUNCE;
+    if (Math.abs(playerSpeed) > 1) {
+      playSound(150, 0.15, 'triangle', 0.1);
+    }
+    // Extra tire damage on wall hit
+    tireWear = tireWear.map(t => Math.max(0, t - 2));
+  }
+
+  playerCar.position.copy(newPos);
   playerCar.position.y = 0.5;
 
   // Spin wheels
   if (playerCar.userData.wheels) {
     playerCar.userData.wheels.forEach(w => {
-      w.rotation.x += playerSpeed * 0.5;
+      w.rotation.x += playerSpeed * 0.5 * dt * 60;
     });
   }
 
   // Tire wear
-  const wearRate = dt * (0.3 + Math.abs(playerSteer) * 5 + (Math.abs(playerSpeed) > MAX_SPEED / 25 ? 0.5 : 0));
-  tireWear = tireWear.map(t => Math.max(0, t - wearRate));
+  const wearRate = dt * (0.3 + Math.abs(playerSteer) * 5 + (absSpd > MAX_SPEED / 25 ? 0.5 : 0));
+  if (!info.onTrack) { // extra wear off track
+    tireWear = tireWear.map(t => Math.max(0, t - wearRate * 3));
+  } else {
+    tireWear = tireWear.map(t => Math.max(0, t - wearRate));
+  }
 
-  // Tire squeal sound
-  if (Math.abs(playerSteer) > MAX_STEER * 0.6 && Math.abs(playerSpeed) > 3) {
-    // Could add continuous squeal here
+  // Grip penalty from worn tires
+  if (Math.min(...tireWear) < 20) {
+    playerSpeed *= Math.pow(0.999, dt * 60);
   }
 
   // Lap tracking
@@ -930,10 +987,11 @@ function updatePlayer(dt) {
   aiCars.forEach(ai => {
     const dist = playerCar.position.distanceTo(ai.mesh.position);
     if (dist < 3) {
-      // Push apart
       const pushDir = new THREE.Vector3().subVectors(playerCar.position, ai.mesh.position).normalize();
-      playerCar.position.add(pushDir.multiplyScalar(0.3));
-      playerSpeed *= 0.9;
+      playerCar.position.add(pushDir.multiplyScalar(0.5));
+      ai.mesh.position.add(pushDir.multiplyScalar(-0.3));
+      playerSpeed *= 0.85;
+      ai.speed *= 0.9;
       playSound(200, 0.1, 'triangle', 0.08);
     }
   });
@@ -947,11 +1005,10 @@ function updateAI(dt) {
     const dz = target.z - ai.mesh.position.z;
     const targetAngle = Math.atan2(dx, dz);
 
-    // Smooth angle
     let diff = targetAngle - ai.angle;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
-    ai.angle += diff * 0.08;
+    ai.angle += diff * 0.08 * dt * 60;
     ai.mesh.rotation.y = ai.angle;
 
     // Speed based on corner sharpness
@@ -962,15 +1019,27 @@ function updateAI(dt) {
     const cornerFactor = 1 - cornerDiff * 1.5;
     const targetSpeed = Math.max(3, 8 * ai.baseSpeed * Math.max(0.3, cornerFactor));
 
-    ai.speed += (targetSpeed - ai.speed) * 0.05;
+    ai.speed += (targetSpeed - ai.speed) * 0.05 * dt * 60;
 
-    ai.mesh.position.x += Math.sin(ai.angle) * ai.speed * dt * 60;
-    ai.mesh.position.z += Math.cos(ai.angle) * ai.speed * dt * 60;
+    const newX = ai.mesh.position.x + Math.sin(ai.angle) * ai.speed * dt;
+    const newZ = ai.mesh.position.z + Math.cos(ai.angle) * ai.speed * dt;
+    const newPos = new THREE.Vector3(newX, 0.5, newZ);
+
+    // Keep AI on track - check boundaries
+    const aiInfo = getTrackInfo(newPos);
+    if (aiInfo.hitBarrier) {
+      const pushBack = aiInfo.perpDir.clone().multiplyScalar(
+        -Math.sign(aiInfo.signedDist) * (aiInfo.centerDist - BARRIER_DIST + 1)
+      );
+      newPos.add(pushBack);
+      ai.speed *= 0.6;
+    }
+
+    ai.mesh.position.copy(newPos);
     ai.mesh.position.y = 0.5;
 
-    // Spin wheels
     if (ai.mesh.userData.wheels) {
-      ai.mesh.userData.wheels.forEach(w => { w.rotation.x += ai.speed * 0.3; });
+      ai.mesh.userData.wheels.forEach(w => { w.rotation.x += ai.speed * 0.3 * dt; });
     }
 
     // Advance waypoint
@@ -980,7 +1049,6 @@ function updateAI(dt) {
       ai.waypointIdx = (ai.waypointIdx + 1) % trackPoints.length;
       ai.lapProgress = ai.waypointIdx / trackPoints.length;
 
-      // Lap count
       if (prevIdx > trackPoints.length * 0.8 && ai.waypointIdx < trackPoints.length * 0.2) {
         ai.lap++;
       }
