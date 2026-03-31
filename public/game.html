@@ -1217,18 +1217,39 @@ function drawMinimap() {
 
 // ============ ON-SCREEN CONTROLS ============
 function setupControls() {
+  const activeButtons = new Map(); // track which buttons are pressed
+
   const bind = (id, key) => {
     const el = document.getElementById(id);
     if (!el) return;
-    // Mouse support
-    el.addEventListener('mousedown', e => { e.preventDefault(); keys[key] = true; el.classList.add('pressed'); initAudio(); });
-    el.addEventListener('mouseup', e => { e.preventDefault(); keys[key] = false; el.classList.remove('pressed'); });
-    el.addEventListener('mouseleave', e => { keys[key] = false; el.classList.remove('pressed'); });
-    // Touch support
-    el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; el.classList.add('pressed'); initAudio(); }, {passive: false});
-    el.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; el.classList.remove('pressed'); });
-    el.addEventListener('touchcancel', e => { keys[key] = false; el.classList.remove('pressed'); });
+    const press = (e) => { e.preventDefault(); keys[key] = true; el.classList.add('pressed'); activeButtons.set(id, key); initAudio(); };
+    const release = (e) => { e.preventDefault(); keys[key] = false; el.classList.remove('pressed'); activeButtons.delete(id); };
+    el.addEventListener('mousedown', press);
+    el.addEventListener('mouseup', release);
+    el.addEventListener('mouseleave', release);
+    el.addEventListener('touchstart', press, {passive: false});
+    el.addEventListener('touchend', release);
+    el.addEventListener('touchcancel', release);
   };
+
+  // Global mouseup/touchend to catch releases outside buttons
+  window.addEventListener('mouseup', () => {
+    activeButtons.forEach((key, id) => {
+      keys[key] = false;
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('pressed');
+    });
+    activeButtons.clear();
+  });
+  window.addEventListener('touchend', () => {
+    activeButtons.forEach((key, id) => {
+      keys[key] = false;
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('pressed');
+    });
+    activeButtons.clear();
+  });
+
   bind('cb-gas', 'ArrowUp');
   bind('cb-brake', 'ArrowDown');
   bind('cb-reverse', 'KeyS');
