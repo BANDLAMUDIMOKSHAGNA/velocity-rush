@@ -1005,11 +1005,10 @@ function updateAI(dt) {
     const dz = target.z - ai.mesh.position.z;
     const targetAngle = Math.atan2(dx, dz);
 
-    // Smooth angle
     let diff = targetAngle - ai.angle;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
-    ai.angle += diff * 0.08;
+    ai.angle += diff * 0.08 * dt * 60;
     ai.mesh.rotation.y = ai.angle;
 
     // Speed based on corner sharpness
@@ -1020,15 +1019,27 @@ function updateAI(dt) {
     const cornerFactor = 1 - cornerDiff * 1.5;
     const targetSpeed = Math.max(3, 8 * ai.baseSpeed * Math.max(0.3, cornerFactor));
 
-    ai.speed += (targetSpeed - ai.speed) * 0.05;
+    ai.speed += (targetSpeed - ai.speed) * 0.05 * dt * 60;
 
-    ai.mesh.position.x += Math.sin(ai.angle) * ai.speed * dt * 60;
-    ai.mesh.position.z += Math.cos(ai.angle) * ai.speed * dt * 60;
+    const newX = ai.mesh.position.x + Math.sin(ai.angle) * ai.speed * dt;
+    const newZ = ai.mesh.position.z + Math.cos(ai.angle) * ai.speed * dt;
+    const newPos = new THREE.Vector3(newX, 0.5, newZ);
+
+    // Keep AI on track - check boundaries
+    const aiInfo = getTrackInfo(newPos);
+    if (aiInfo.hitBarrier) {
+      const pushBack = aiInfo.perpDir.clone().multiplyScalar(
+        -Math.sign(aiInfo.signedDist) * (aiInfo.centerDist - BARRIER_DIST + 1)
+      );
+      newPos.add(pushBack);
+      ai.speed *= 0.6;
+    }
+
+    ai.mesh.position.copy(newPos);
     ai.mesh.position.y = 0.5;
 
-    // Spin wheels
     if (ai.mesh.userData.wheels) {
-      ai.mesh.userData.wheels.forEach(w => { w.rotation.x += ai.speed * 0.3; });
+      ai.mesh.userData.wheels.forEach(w => { w.rotation.x += ai.speed * 0.3 * dt; });
     }
 
     // Advance waypoint
@@ -1038,7 +1049,6 @@ function updateAI(dt) {
       ai.waypointIdx = (ai.waypointIdx + 1) % trackPoints.length;
       ai.lapProgress = ai.waypointIdx / trackPoints.length;
 
-      // Lap count
       if (prevIdx > trackPoints.length * 0.8 && ai.waypointIdx < trackPoints.length * 0.2) {
         ai.lap++;
       }
