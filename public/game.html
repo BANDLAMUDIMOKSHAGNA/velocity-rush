@@ -714,6 +714,7 @@ function startRace() {
         lights.forEach(id => document.getElementById(id).classList.remove('green'));
         document.getElementById('hud').style.display = 'block';
         gameState = 'racing';
+        showGameControls(true);
         raceStartTime = performance.now();
         lapStartTime = raceStartTime;
         sectorStartTime = raceStartTime;
