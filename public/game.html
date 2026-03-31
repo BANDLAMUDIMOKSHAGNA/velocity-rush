@@ -192,15 +192,21 @@ ESC - Pause<br>
 // ============ GAME CONFIG ============
 const TOTAL_LAPS = 5;
 const NUM_AI = 5;
-const GEAR_RATIOS = [0, 0.025, 0.04, 0.055, 0.065, 0.075, 0.085];
+// Gear system: each gear has [power multiplier, max speed in internal units]
+// Internal speed 1.0 ≈ 20 km/h, so gear 6 tops at 16 = 320 km/h
+const GEAR_MAX_SPEED = [0, 2.5, 5, 8, 11, 14, 16]; // max speed per gear
+const GEAR_POWER =     [0, 0.06, 0.05, 0.045, 0.038, 0.032, 0.028]; // acceleration per gear
 const MAX_RPM = 12000;
 const IDLE_RPM = 3000;
+const REDLINE_RPM = 11400; // shift point
 const MAX_SPEED = 320;
 const BRAKE_FORCE = 0.035;
+const ENGINE_BRAKE = 0.008; // engine braking when off throttle
 const STEER_SPEED = 0.035;
 const MAX_STEER = 0.045;
 const DRAG = 0.997;
 const GRASS_DRAG = 0.98;
+const AUTO_TRANSMISSION = true; // set false for manual only
 
 // ============ TRACK WAYPOINTS (oval-ish circuit) ============
 const trackPoints = [];
@@ -794,24 +800,45 @@ function updatePlayer(dt) {
   const right = keys['ArrowRight'] || keys['KeyD'];
   const handbrake = keys['Space'];
 
+  // Calculate RPM from speed and current gear
+  const gearMaxSpd = GEAR_MAX_SPEED[playerGear] || 1;
+  const speedRatio = Math.abs(playerSpeed) / gearMaxSpd;
+  playerRPM = IDLE_RPM + (MAX_RPM - IDLE_RPM) * Math.min(1, speedRatio);
+
   // Acceleration
   if (accel) {
-    const gearPower = GEAR_RATIOS[playerGear] || 0;
-    let power = gearPower * dt * 60;
-    if (ersActive && ers > 0) { power *= 1.4; ers = Math.max(0, ers - dt * 25); }
-    if (drsActive) power *= 1.15;
-    playerSpeed += power;
-    playerRPM = Math.min(MAX_RPM, playerRPM + dt * 4000);
+    // Only produce power if RPM is below redline
+    if (playerRPM < MAX_RPM) {
+      let power = GEAR_POWER[playerGear] * dt * 60;
+      // Reduce power as we approach gear's max speed
+      const powerFalloff = Math.max(0, 1 - speedRatio * 0.9);
+      power *= powerFalloff;
+      if (ersActive && ers > 0) { power *= 1.4; ers = Math.max(0, ers - dt * 25); }
+      if (drsActive) power *= 1.15;
+      playerSpeed += power;
+    }
 
-    // Auto upshift
-    if (playerRPM > MAX_RPM * 0.95 && playerGear < 6) {
+    // Auto upshift: shift when RPM hits redline
+    if (AUTO_TRANSMISSION && playerRPM >= REDLINE_RPM && playerGear < 6) {
       playerGear++;
-      playerRPM *= 0.7;
       playSound(1200, 0.05, 'square', 0.06);
     }
+    // Auto downshift: shift down when RPM drops too low
+    if (AUTO_TRANSMISSION && playerRPM < IDLE_RPM + 1500 && playerGear > 1 && playerSpeed > 0.5) {
+      playerGear--;
+      playSound(600, 0.04, 'square', 0.05);
+    }
   } else {
-    playerRPM = Math.max(IDLE_RPM, playerRPM - dt * 3000);
-    if (!ersActive) ersActive = false;
+    // Engine braking when off throttle
+    if (playerSpeed > 0.1) {
+      playerSpeed -= ENGINE_BRAKE * dt * 60;
+    } else if (playerSpeed > 0) {
+      playerSpeed = 0;
+    }
+    // Auto downshift when coasting
+    if (AUTO_TRANSMISSION && playerRPM < IDLE_RPM + 1000 && playerGear > 1) {
+      playerGear--;
+    }
   }
 
   if (brake) {
