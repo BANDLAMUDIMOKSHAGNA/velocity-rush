@@ -727,6 +727,7 @@ function handleKey(e) {
   if (e.code === 'Escape' && gameState === 'racing') {
     gameState = 'paused';
     document.getElementById('pause-screen').style.display = 'flex';
+    showGameControls(false);
   } else if (e.code === 'Escape' && gameState === 'paused') {
     resumeGame();
   }
