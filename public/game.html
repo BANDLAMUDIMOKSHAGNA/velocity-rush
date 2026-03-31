@@ -192,15 +192,21 @@ ESC - Pause<br>
 // ============ GAME CONFIG ============
 const TOTAL_LAPS = 5;
 const NUM_AI = 5;
-const GEAR_RATIOS = [0, 0.025, 0.04, 0.055, 0.065, 0.075, 0.085];
+// Gear system: each gear has [power multiplier, max speed in internal units]
+// Internal speed 1.0 ≈ 20 km/h, so gear 6 tops at 16 = 320 km/h
+const GEAR_MAX_SPEED = [0, 2.5, 5, 8, 11, 14, 16]; // max speed per gear
+const GEAR_POWER =     [0, 0.06, 0.05, 0.045, 0.038, 0.032, 0.028]; // acceleration per gear
 const MAX_RPM = 12000;
 const IDLE_RPM = 3000;
+const REDLINE_RPM = 11400; // shift point
 const MAX_SPEED = 320;
 const BRAKE_FORCE = 0.035;
+const ENGINE_BRAKE = 0.008; // engine braking when off throttle
 const STEER_SPEED = 0.035;
 const MAX_STEER = 0.045;
 const DRAG = 0.997;
 const GRASS_DRAG = 0.98;
+const AUTO_TRANSMISSION = true; // set false for manual only
 
 // ============ TRACK WAYPOINTS (oval-ish circuit) ============
 const trackPoints = [];
