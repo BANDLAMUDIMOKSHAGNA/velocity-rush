@@ -187,16 +187,28 @@ ESC - Pause<br>
 </div>
 </div>
 
-<!-- Mobile -->
-<div class="mobile-controls" id="mobile-controls">
-<div class="m-dpad">
-<div></div><div class="m-btn" id="mb-up">▲</div><div></div>
-<div class="m-btn" id="mb-left">◄</div><div class="m-btn" id="mb-down">▼</div><div class="m-btn" id="mb-right">►</div>
-</div>
-<div class="m-actions">
-<div class="m-btn" id="mb-ers" style="font-size:11px">ERS</div>
-<div class="m-btn" id="mb-drs" style="font-size:11px">DRS</div>
-</div>
+<!-- On-screen controls -->
+<div class="game-controls" id="game-controls" style="display:none">
+  <div class="ctrl-group">
+    <div class="dpad-wrap">
+      <div class="ctrl-btn ctrl-dir" id="cb-left">◄</div>
+      <div class="ctrl-btn ctrl-dir" id="cb-right">►</div>
+    </div>
+  </div>
+  <div class="ctrl-group">
+    <div class="pedals-wrap">
+      <div class="ctrl-btn ctrl-pedal reverse" id="cb-reverse"><div style="text-align:center">⬇<div class="label">Back</div></div></div>
+      <div class="ctrl-btn ctrl-pedal brake" id="cb-brake"><div style="text-align:center">■<div class="label">Brake</div></div></div>
+      <div class="ctrl-btn ctrl-pedal gas" id="cb-gas"><div style="text-align:center">⬆<div class="label">Speed</div></div></div>
+    </div>
+  </div>
+  <div class="ctrl-group">
+    <div class="actions-wrap">
+      <div class="ctrl-btn ctrl-action" id="cb-ers">ERS</div>
+      <div class="ctrl-btn ctrl-action" id="cb-drs">DRS</div>
+      <div class="ctrl-btn ctrl-action" id="cb-hbrake">HB</div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
