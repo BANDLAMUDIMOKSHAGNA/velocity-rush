@@ -192,21 +192,23 @@ ESC - Pause<br>
 // ============ GAME CONFIG ============
 const TOTAL_LAPS = 5;
 const NUM_AI = 5;
-// Gear system: each gear has [power multiplier, max speed in internal units]
-// Internal speed 1.0 ≈ 20 km/h, so gear 6 tops at 16 = 320 km/h
-const GEAR_MAX_SPEED = [0, 2.5, 5, 8, 11, 14, 16]; // max speed per gear
-const GEAR_POWER =     [0, 0.06, 0.05, 0.045, 0.038, 0.032, 0.028]; // acceleration per gear
+const GEAR_MAX_SPEED = [0, 2.5, 5, 8, 11, 14, 16];
+const GEAR_POWER =     [0, 0.06, 0.05, 0.045, 0.038, 0.032, 0.028];
 const MAX_RPM = 12000;
 const IDLE_RPM = 3000;
-const REDLINE_RPM = 11400; // shift point
+const REDLINE_RPM = 11400;
 const MAX_SPEED = 320;
 const BRAKE_FORCE = 0.035;
-const ENGINE_BRAKE = 0.008; // engine braking when off throttle
-const STEER_SPEED = 0.035;
-const MAX_STEER = 0.045;
+const ENGINE_BRAKE = 0.008;
+const STEER_SPEED = 2.5;    // radians/sec steering input rate
+const MAX_STEER = 0.045;    // max steer angle
 const DRAG = 0.997;
-const GRASS_DRAG = 0.98;
-const AUTO_TRANSMISSION = true; // set false for manual only
+const GRASS_DRAG = 0.96;
+const GRAVEL_DRAG = 0.93;
+const AUTO_TRANSMISSION = true;
+const TRACK_HALF_WIDTH = 7; // half of 14-unit track
+const BARRIER_DIST = 16.5;  // trackHalf + kerb(1.5) + gravel(8) = 16.5
+const WALL_BOUNCE = 0.4;    // speed retained on wall hit
 
 // ============ TRACK WAYPOINTS (oval-ish circuit) ============
 const trackPoints = [];
