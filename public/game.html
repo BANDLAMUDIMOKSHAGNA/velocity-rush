@@ -790,6 +790,7 @@ function finishRace() {
   gameState = 'results';
   document.getElementById('hud').style.display = 'none';
   document.getElementById('results-screen').style.display = 'flex';
+  showGameControls(false);
 
   // Build results
   const all = [{name: 'YOU', lap: currentLap, progress: playerLapProgress, bestTime: bestLapTime}];
