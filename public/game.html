@@ -877,12 +877,15 @@ function updatePlayer(dt) {
       playSound(600, 0.04, 'square', 0.05);
     }
   } else {
-    if (playerSpeed > 0.1) {
-      playerSpeed -= ENGINE_BRAKE * dt * 60;
+    // Strong deceleration when not pressing gas - car should stop quickly
+    if (playerSpeed > 0.05) {
+      playerSpeed *= Math.pow(0.94, dt * 60); // friction slowdown
+      playerSpeed -= 0.02 * dt * 60;          // constant braking
+      if (playerSpeed < 0) playerSpeed = 0;
     } else if (playerSpeed > 0) {
       playerSpeed = 0;
     }
-    if (AUTO_TRANSMISSION && playerRPM < IDLE_RPM + 1000 && playerGear > 1) {
+    if (AUTO_TRANSMISSION && playerGear > 1) {
       playerGear--;
     }
   }
