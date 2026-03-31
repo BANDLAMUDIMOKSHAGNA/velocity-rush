@@ -73,12 +73,24 @@ canvas{display:block;position:fixed;top:0;left:0;width:100%;height:100%;z-index:
 .results-list{font-size:18px;line-height:2.2;text-align:center}
 .results-list .p1{color:gold;font-weight:700;font-size:22px}
 
-/* Mobile controls */
-.mobile-controls{position:fixed;bottom:0;left:0;right:0;z-index:15;display:none;padding:10px;justify-content:space-between}
-@media(max-width:768px){.mobile-controls{display:flex}}
-.m-btn{pointer-events:all;width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,0.15);border:2px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;-webkit-tap-highlight-color:transparent}
-.m-dpad{display:grid;grid-template-columns:60px 60px 60px;grid-template-rows:60px 60px;gap:4px}
-.m-actions{display:flex;gap:8px;align-items:flex-end}
+/* On-screen controls - always visible */
+.game-controls{position:fixed;bottom:0;left:0;right:0;z-index:15;display:flex;padding:14px 20px;justify-content:space-between;align-items:flex-end;pointer-events:none}
+.ctrl-group{display:flex;gap:6px;align-items:flex-end;pointer-events:none}
+.ctrl-btn{pointer-events:all;cursor:pointer;border-radius:12px;background:rgba(255,255,255,0.12);border:2px solid rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;color:#fff;-webkit-tap-highlight-color:transparent;user-select:none;backdrop-filter:blur(4px);transition:background 0.1s,border-color 0.1s}
+.ctrl-btn:active,.ctrl-btn.pressed{background:rgba(255,255,255,0.35);border-color:rgba(255,255,255,0.6)}
+.ctrl-btn .label{font-size:10px;letter-spacing:1px;text-transform:uppercase;opacity:0.7;margin-top:2px}
+.ctrl-dir{width:64px;height:64px;font-size:24px}
+.ctrl-pedal{width:72px;height:80px;font-size:16px;flex-direction:column;gap:2px}
+.ctrl-action{width:56px;height:56px;font-size:11px;font-weight:700;letter-spacing:1px}
+.ctrl-pedal.gas{border-color:rgba(0,200,0,0.5);color:#0c0}
+.ctrl-pedal.gas:active,.ctrl-pedal.gas.pressed{background:rgba(0,200,0,0.3);border-color:#0c0}
+.ctrl-pedal.brake{border-color:rgba(255,50,50,0.5);color:#f44}
+.ctrl-pedal.brake:active,.ctrl-pedal.brake.pressed{background:rgba(255,50,50,0.3);border-color:#f44}
+.ctrl-pedal.reverse{border-color:rgba(255,165,0,0.5);color:#fa0}
+.ctrl-pedal.reverse:active,.ctrl-pedal.reverse.pressed{background:rgba(255,165,0,0.3);border-color:#fa0}
+.dpad-wrap{display:grid;grid-template-columns:64px 64px;grid-template-rows:64px;gap:6px}
+.pedals-wrap{display:flex;gap:8px;align-items:flex-end}
+.actions-wrap{display:flex;gap:6px;flex-direction:column}
 </style>
 </head>
 <body>
